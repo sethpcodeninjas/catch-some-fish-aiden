@@ -17,13 +17,41 @@ function introSequence () {
 }
 controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
     lure.ay = 300
-    if (lure.vy >= 0 && controller.A.isPressed() && canReel == true) {
-        lure.vy = -100
+    if (controller.A.isPressed() && canReel == true) {
+        lure.vy = -150
+        lure.setKind(SpriteKind.CatchingLure)
     }
 })
-scene.onOverlapTile(SpriteKind.Player, assets.tile`transparency16`, function (sprite, location) {
-	
+scene.onOverlapTile(SpriteKind.CatchingLure, assets.tile`transparency16`, function (sprite, location) {
+    sprite.setVelocity(0, 0)
+    sprite.ay = 0
+    checkScore()
 })
+function checkScore() {
+    lure.destroy()
+    let allCaught = sprites.allOfKind(SpriteKind.CaughtFish)
+    // Creating score and roll call fishies
+    let sum = 0
+    for(let f of allCaught){
+
+        sum += sprites.readDataNumber(f, "points")
+
+        story.queueStoryPart(function() {
+            story.spriteMoveToLocation(f, 80, 150, 50)
+        })
+        story.queueStoryPart(function() {
+            f.say("" + sprites.readDataNumber(f, "points"))
+        })
+        story.queueStoryPart(function() {
+            pause(1000)
+            f.destroy()
+        })
+    }
+    story.queueStoryPart(function() {
+      info.setScore(sum)
+      game.over(true)  
+    })
+}
 function spawnFish (numOfFish: number) {
     for (let index = 0; index < numOfFish; index++) {
         randomFishIndex = randint(0, fishImgs.length - 1)
@@ -36,18 +64,29 @@ function spawnFish (numOfFish: number) {
         } else {
             newFish.vx = randint(-20, -10)
         }
-        let rightImg = fishImgs[randomFishIndex]
-        let leftImg = rightImg.clone()
+        rightImg = fishImgs[randomFishIndex]
+        leftImg = rightImg.clone()
         leftImg.flipX()
         sprites.setDataImage(newFish, "rightImg",rightImg )
+        sprites.setDataImage(newFish, "leftImg", leftImg)
+        sprites.setDataNumber(newFish, "points", fishPoints[randomFishIndex])
     }
 }
+sprites.onOverlap(SpriteKind.CatchingLure, SpriteKind.SwimmingFish, function (sprite, otherSprite) {
+    otherSprite.follow(sprite)
+    otherSprite.setKind(SpriteKind.CaughtFish)
+})
+let leftImg2: Image = null
+let rightImg2: Image = null
+let fishies: Sprite[] = []
+let leftImg: Image = null
+let rightImg: Image = null
 let direction = 0
-let newFish: Sprite = null
 let randomFishIndex = 0
 let canReel = false
 let lure: Sprite = null
 let fishImgs: Image[] = []
+let newFish: Sprite = null
 let vel = 100
 let titleScreen = sprites.create(img`
     ................................................................................................................................................................
@@ -557,16 +596,21 @@ lure = sprites.create(img`
     `, SpriteKind.Player)
 introSequence()
 spawnFish(15)
+// Constrain lure speed & update swimming direction
 game.onUpdate(function () {
     lure.vy = Math.constrain(lure.vy, -100, 80)
-let fishies = sprites.allOfKind(SpriteKind.SwimmingFish)
- for (let fish of fishies){
-    if (fish.vx > 0 ) {
-    	
-    } else {
-    	
+    // Array of all swimming fish.
+    fishies = sprites.allOfKind(SpriteKind.SwimmingFish)
+    // Loop through all fish and change swimming direction
+    for (let fish of fishies) {
+        if (fish.vx > 0) {
+            rightImg2 = sprites.readDataImage(fish, "rightImg")
+            fish.setImage(rightImg2)
+        } else {
+            leftImg2 = sprites.readDataImage(fish, "leftImg")
+            fish.setImage(leftImg2)
+        }
     }
-}
 })
 forever(function () {
     music.playMelody("C C5 C5 B C5 B B G ", 120)
